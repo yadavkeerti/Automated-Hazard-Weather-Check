@@ -2,7 +2,7 @@ name: Automated Hazard Weather Check
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # Runs automatically every 6 hours
+    - cron: '0 */6 * * *'  # Runs every 6 hours
   workflow_dispatch: # Allows you to trigger it manually anytime
 
 jobs:
