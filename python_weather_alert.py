@@ -7,7 +7,7 @@ MONITORING_ZONES = [
     {"name": "Chitwan / Narayani Basin", "lat": 27.5291, "lon": 84.3542},
 ]
 
-RAINFALL_THRESHOLD_MM = 0.1
+RAINFALL_THRESHOLD_MM = -1.0
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
