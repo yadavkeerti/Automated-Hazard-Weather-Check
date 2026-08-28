@@ -1,22 +1,22 @@
 import os
+import time
 import requests
 
-# Target cities combined with their upstream high-altitude feeder zones
 MONITORING_ZONES = [
     {
         "name": "Kathmandu Valley & Upstream Northern Basin", 
         "target_lat": 27.7172, "target_lon": 85.3240,
-        "upstream_lat": 27.9172, "upstream_lon": 85.3240 # North into Shivapuri/langtang foothills
+        "upstream_lat": 27.9172, "upstream_lon": 85.3240
     },
     {
         "name": "Pokhara / Kaski & Seti River Basin", 
         "target_lat": 28.2096, "target_lon": 83.9856,
-        "upstream_lat": 28.4596, "upstream_lon": 83.9856 # North toward Annapurna foothills
+        "upstream_lat": 28.4596, "upstream_lon": 83.9856
     },
     {
         "name": "Chitwan / Narayani Basin", 
         "target_lat": 27.5291, "target_lon": 84.3542,
-        "upstream_lat": 27.8291, "upstream_lon": 84.3542 # Upstream toward mid-hills
+        "upstream_lat": 27.8291, "upstream_lon": 84.3542
     },
 ]
 
@@ -33,11 +33,31 @@ def send_telegram_alert(message):
         "text": message, 
         "parse_mode": "Markdown"
     }
-    response = requests.post(url, json=payload)
-    if response.status_code == 200:
-        print("Telegram alert sent successfully!")
-    else:
-        print(f"Failed to send alert: {response.text}")
+    
+    # Retry loop for sending telegram message
+    for attempt in range(3):
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+            if response.status_code == 200:
+                print("Telegram alert sent successfully!")
+                return
+            else:
+                print(f"Attempt {attempt+1} failed to send alert: {response.text}")
+        except Exception as e:
+            print(f"Attempt {attempt+1} connection error: {e}")
+        time.sleep(2)
+
+def fetch_with_retry(url):
+    """Helper function to retry API requests if network glitches happen"""
+    for attempt in range(3):
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+        except Exception as e:
+            print(f"Network error fetching {url} (Attempt {attempt+1}/3): {e}")
+        time.sleep(2)
+    return None
 
 def evaluate_weather_severity(precip):
     if precip >= 75.0:
@@ -49,32 +69,26 @@ def evaluate_weather_severity(precip):
     return None
 
 def check_all_hazard_zones():
-    print("Scanning multi-tier weather forecasts & upstream basins across Nepal...")
+    print("Scanning multi-tier weather forecasts & upstream basins safely...")
     gee_app_url = "https://yadavkeerti1199.users.earthengine.app/view/hazardalertinhimalayas"
     
     for zone in MONITORING_ZONES:
-        # 1. Check Target City Forecast
         target_url = f"https://api.open-meteo.com/v1/forecast?latitude={zone['target_lat']}&longitude={zone['target_lon']}&daily=precipitation_sum&timezone=auto"
-        t_res = requests.get(target_url)
-        
-        # 2. Check Upstream Feeder Basin Forecast
         upstream_url = f"https://api.open-meteo.com/v1/forecast?latitude={zone['upstream_lat']}&longitude={zone['upstream_lon']}&daily=precipitation_sum&timezone=auto"
-        u_res = requests.get(upstream_url)
         
-        if t_res.status_code != 200 or u_res.status_code != 200:
-            print(f"Failed to fetch data for {zone['name']}")
+        t_data = fetch_with_retry(target_url)
+        u_data = fetch_with_retry(upstream_url)
+        
+        if not t_data or not u_data:
+            print(f"Skipping {zone['name']} due to persistent network connection issues.")
             continue
 
-        t_data = t_res.json()
-        u_data = u_res.json()
-        
         target_precip = t_data["daily"]["precipitation_sum"][0]
         upstream_precip = u_data["daily"]["precipitation_sum"][0]
         date = t_data["daily"]["time"][0]
 
         print(f"- {zone['name']}: Local Rain = {target_precip}mm | Upstream Rain = {upstream_precip}mm on {date}")
 
-        # Evaluate highest risk between local and upstream conditions
         max_precip = max(target_precip, upstream_precip)
         severity_tier = evaluate_weather_severity(max_precip)
         
@@ -91,15 +105,16 @@ def check_all_hazard_zones():
             send_telegram_alert(alert_msg)
 
 def check_earthquakes():
-    print("Scanning live seismic activity around Nepal...")
+    print("Scanning live seismic activity safely around Nepal...")
     gee_app_url = "https://yadavkeerti1199.users.earthengine.app/view/hazardalertinhimalayas"
     url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson"
     
-    response = requests.get(url)
-    if response.status_code != 200:
+    data = fetch_with_retry(url)
+    if not data:
+        print("Failed to fetch earthquake data from USGS.")
         return
 
-    quakes = response.json().get("features", [])
+    quakes = data.get("features", [])
     for quake in quakes:
         props = quake["properties"]
         geom = quake["geometry"]
