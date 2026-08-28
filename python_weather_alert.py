@@ -31,7 +31,7 @@ def send_telegram_alert(message):
 
 def check_all_hazard_zones():
     print("Scanning live weather forecasts across Nepal hazard zones...")
-    gee_app_url = "https://browngirlinkpopworld.users.earthengine.app"
+    gee_app_url = "https://yadavkeerti1199.users.earthengine.app/view/hazardalertinhimalayas"
     
     for zone in MONITORING_ZONES:
         url = f"https://api.open-meteo.com/v1/forecast?latitude={zone['lat']}&longitude={zone['lon']}&daily=precipitation_sum&timezone=auto"
