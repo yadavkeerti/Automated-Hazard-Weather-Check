@@ -17,7 +17,11 @@ def send_telegram_alert(message):
         print("Telegram credentials missing!")
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID, 
+        "text": message, 
+        "parse_mode": "Markdown"
+    }
     response = requests.post(url, json=payload)
     if response.status_code == 200:
         print("Telegram alert sent successfully!")
@@ -27,6 +31,8 @@ def send_telegram_alert(message):
 
 def check_all_hazard_zones():
     print("Scanning live weather forecasts across Nepal hazard zones...")
+    gee_app_url = "https://browngirlinkpopworld.users.earthengine.app"
+    
     for zone in MONITORING_ZONES:
         url = f"https://api.open-meteo.com/v1/forecast?latitude={zone['lat']}&longitude={zone['lon']}&daily=precipitation_sum&timezone=auto"
         response = requests.get(url)
@@ -41,7 +47,11 @@ def check_all_hazard_zones():
         print(f"- {zone['name']}: Expected Rainfall = {daily_precip}mm on {date}")
 
         if daily_precip >= RAINFALL_THRESHOLD_MM:
-            alert_msg = f"🚨 FLOOD HAZARD ALERT: {zone['name']}! 🚨\nForecasted rain: {daily_precip}mm on {date}. Immediate review required!"
+            alert_msg = (
+                f"🚨 *FLOOD HAZARD ALERT: {zone['name']}!* 🚨\n"
+                f"Forecasted rain: *{daily_precip}mm* on {date}.\n\n"
+                f"🔍 [Click here to open live GEE Risk Platform]({gee_app_url})"
+            )
             send_telegram_alert(alert_msg)
 
 
