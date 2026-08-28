@@ -7,7 +7,8 @@ MONITORING_ZONES = [
     {"name": "Chitwan / Narayani Basin", "lat": 27.5291, "lon": 84.3542},
 ]
 
-RAINFALL_THRESHOLD_MM = -1.0
+RAINFALL_THRESHOLD_MM = 30.0
+EARTHQUAKE_MAGNITUDE_THRESHOLD = 4.5  # Alert if magnitude is >= 4.5
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
@@ -55,5 +56,36 @@ def check_all_hazard_zones():
             send_telegram_alert(alert_msg)
 
 
+def check_earthquakes():
+    print("Scanning live seismic activity around Nepal...")
+    gee_app_url = "https://yadavkeerti1199.users.earthengine.app/view/hazardalertinhimalayas"
+    url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson"
+    
+    response = requests.get(url)
+    if response.status_code != 200:
+        print("Failed to fetch earthquake data")
+        return
+
+    quakes = response.json().get("features", [])
+    for quake in quakes:
+        props = quake["properties"]
+        geom = quake["geometry"]
+        mag = props.get("mag", 0)
+        place = props.get("place", "Unknown location")
+        
+        # Bounding box roughly covering Nepal region
+        lon, lat = geom["coordinates"][0], geom["coordinates"][1]
+        if (26.0 <= lat <= 30.4) and (80.0 <= lon <= 88.2):
+            if mag >= EARTHQUAKE_MAGNITUDE_THRESHOLD:
+                alert_msg = (
+                    f"⚠️ *SEISMIC / EARTHQUAKE ALERT* ⚠️\n"
+                    f"Magnitude: *{mag}* near {place}\n"
+                    f"Check regional stability immediately!\n\n"
+                    f"🔍 [Open Live GEE Platform]({gee_app_url})"
+                )
+                send_telegram_alert(alert_msg)
+
+
 if __name__ == "__main__":
     check_all_hazard_zones()
+    check_earthquakes()
